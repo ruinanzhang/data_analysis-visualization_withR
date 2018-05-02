@@ -1,0 +1,195 @@
+---
+title: "Exploring the BRFSS data"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+  word_document: default
+---
+## Ruinan Zhang 
+## Setup
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+#doInstall <- TRUE
+#toInstall <- c("maps", "ggplot2")
+#if(doInstall){install.packages(toInstall, repos = "http://cran.us.r-project.org")}
+#lapply(toInstall, library, character.only = TRUE)
+library(ggplot2)
+library(dplyr)
+library(scales)
+library(maps)
+```
+
+### Load data
+
+Make sure your data and R Markdown files are in the same directory. When loaded
+your data file will be called `brfss2013`. Delete this note when before you submit 
+your work. 
+
+```{r load-data}
+load("brfss2013.RData")
+```
+
+
+
+* * *
+
+## Part 1: Data
+The data collected in the Behavioral Risk Factor Surveillance System (BRFSS), an observational project that aims to collect state-specific data on preventive health practices and risk behaviors that are linked to chronic disease, injuries, and preventable infectious diseases from the interviews with non-institutionalized adult populate who live in the US’s all 50 states and some other territories. (In 2013, additional question sets were included as optional modules to provide a measure for several childhood health and wellness indicators, including asthma prevalence for people aged 17 years or younger, according to the BRFSS)
+
+The interviews in 2013 were conducted through both landline telephone and cellular telephone. In landline telephone —  interviews collect data from a randomly selected adult in a household.In cellular telephone —  interviewers collect data from an adult who participates by using a cellular telephone and resides in a private residence or college housing. It also used random sampling to select the household’s phone number and which adult to answer the question in each household. 
+
+Since the study didn’t control any variables, it’s an observational study, not a designed experiment, the results can only be associations, there are no conclusions of causation.
+
+After reviewing all the data collection methods and questionnaires, I think most of the questions on the core BRFSS were moderately reliable and valid. However, there are also some methods that need additional research, for instance, many questions were asking the interviewees to self-report based on their own memories, which might not be exactly accurate and sometimes biased. 
+
+What’s more, although the study tried a series of methods to random sample the participants, such as introducing the weighting methodology to account for non-telephone coverage, conducting telephone interviews during each calendar month, making calls both during daytime and evening hours, small demographic differences may still exist because wealthier people/ retired people/ housewives might tend to have telephones and would love to accept survey phones which might cost them about 20 minutes. 
+
+Thus, based on all the previous analysis, since the sample is very large and many methods were taken to generalized the sample, the study is generalizable. However, considering the study is an observational study, the scope of inference is limited and causality can not be determined from the study. 
+
+* * *
+
+## Part 2: Research questions
+
+**Research quesion 1:**
+Does body weight have a relationship with high blood pressure among elder people? 
+Vars: body weight, blood pressure, and age 
+
+**Research quesion 2:**
+
+Does people's (who have exercised in the past 30 days) general health status relate to access to health care? 
+
+var: General health, exercised in past 30 days, access to health care 
+
+**Research quesion 3:**
+Becasue the result of the second question shows that the people who have health care covergae tend to be healtheir than those who don't have. So it would be interesting to see what state is sickest and what is fittest, is income related to this finding? 
+var: genhlth, X_state, poorhlth
+
+* * *
+
+## Part 3: Exploratory data analysis
+
+NOTE: Insert code chunks as needed by clicking on the "Insert a new code chunk" 
+button (green button with orange arrow) above. Make sure that your code is visible
+in the project you submit. Delete this note when before you submit your work.
+
+**Research quesion 1:**
+
+```{r}
+#Q1: Does body weight have a relationship with high blood pressure among elder people? 
+# filter data, choose elder people (age) and remove all N/A in the data set 
+    elder_group <- brfss2013 %>% 
+    filter(X_age65yr == "Age 65 or older" & !is.na(X_bmi5cat) & !is.na(bphigh4))
+# select relavant information, group info I need and count each catagory
+    elder_info <- elder_group %>% select(bphigh4,X_bmi5cat) %>% 
+    group_by(bphigh4,X_bmi5cat) %>%
+    summarise(n = n())
+# plot the bar chart with weith as x aes and has been told by a doctor that he or she had high blood pressure  or not as fillings of each bar
+   ggplot(data = elder_info, aes(X_bmi5cat), y=n) +
+    geom_bar(aes(fill = bphigh4, weight = n),  width = .8, color="black") 
+# As you can see in the 1st bar chart, it will be more obvious to see the relations if we calculate the percentage of yes and no in each weight group. (because the other two factors: "Yes, but female told only during pregnancy" and “Told borderline or pre-hypertensive” are too small, will not show them in the next chart)
+  elder_info2 <- elder_info %>% filter(bphigh4 %in% c("Yes", "No"))
+# plot new bar chart 
+  ggplot(data = elder_info2, aes(x=X_bmi5cat, y=n, fill=bphigh4)) + geom_bar(stat = 'identity', width = .4, color="black") 
+#Conclusion: From the two charts we can see that, among elder people, people that are overweight and obese are more likely to have high pressure. 
+```
+
+
+
+**Research quesion 2:**
+
+```{r}
+#Q2:Does people's (who have exercised in the past 30 days) general health status relate to access to health care? 
+# select relevant data 
+brfss2013_2 <- brfss2013 %>% 
+        select(genhlth, exerany2, hlthpln1)
+# view the data
+str(brfss2013_2)
+# filter people who have exercised in the past 30 days and remove all N/A and useless answers in the data set 
+ppl_ex <- brfss2013_2 %>% 
+        filter(exerany2 == "Yes" & !is.na(genhlth) & !is.na(hlthpln1) & hlthpln1 != "Don’t know/Not Sure" & hlthpln1 != "Refused ") 
+
+#From people who have exercised in the past 30 days,filter people with access to health care and count the number 
+ppl_ex_whc <- ppl_ex %>% filter(hlthpln1 == "Yes") %>%
+        select(genhlth, hlthpln1) %>%
+        group_by(genhlth) %>%
+        summarise(n = n())
+# Plot the barplot of ppl with access to health care
+bar_plot<- ggplot(ppl_ex_whc, aes(x="", y= n , fill=genhlth))+
+geom_bar(width = 1, stat = "identity")
+bar_plot
+#change tge barplot to pie chart 
+pie1 <- bar_plot + coord_polar("y", start=0) + ggtitle("health status of ppl with health care") + xlab("") + ylab("count of health status")
+#from people who have exercised in the past 30 days, filter people without access to health care and count the number 
+ppl_ex_wohc <- ppl_ex %>% filter(hlthpln1 == "No") %>%
+        select(genhlth,hlthpln1)%>%
+        group_by(genhlth) %>%
+        summarise(n = n())
+# Plot the barplot of ppl without access to health care
+bar_plot2<- ggplot(ppl_ex_wohc, aes(x="", y= n , fill=genhlth))+
+geom_bar(width = 1, stat = "identity")
+bar_plot2
+#change tge barplot to pie chart 
+pie2 <- bar_plot2 + coord_polar("y", start=0) + ggtitle("health status of ppl without health care") + xlab("") + ylab("count of health status")
+print(pie1)
+print(pie2)
+
+#After comparing the two pie charts, we can see that people with health care tend to have better health conditions than those who don't have access to health care. For example, the percentage of people in excellent health in the first pie chart (people with health care) is apparently larger than the second pie chart (people withour health care); and the percentage of people in poor health in the first pie chart (people with health care) is apparently smaller than the second pie chart (people withour health care).However, it will be much better if I can label the percentage of each catagory, but I tried several times, I just can't label the text of each catagory in the right place. 
+
+
+```
+
+**Research quesion 3:**
+
+```{r}
+# Q3:What state is sickest, is income related to this finding? 
+# ggplot2 function for heatmapping health status
+us_states <- map_data("state")
+# selecet health status, states name and poor health status from the data set, filter out all the N.A results 
+hs_states <- brfss2013 %>%
+    filter(!is.na(genhlth)) %>% 
+        select(genhlth, X_state, poorhlth)
+# calculate the poor health percentage of all the health situiation by state 
+poorhs_states <- hs_states %>%
+    group_by(genhlth, X_state) %>%
+    summarise(mean(poorhlth),n=n()) %>%
+    mutate(percentage = (n/sum(n))*100)
+
+hs_states_map <- poorhs_states %>%
+    mutate(region= tolower(X_state))
+
+states_map <- merge(us_states, hs_states_map, by="region")
+
+# plot the heating map using the data above 
+ggplot() +
+  geom_polygon(data = states_map, aes(x= long, y = lat, group = group, fill = percentage), color = "white") + 
+  ggtitle("Heat map of poor health conditions in the U.S.") +
+  scale_fill_gradient2(low = "blue", mid = "grey", high = "darkred") + 
+  theme(legend.position = c(1, 0), legend.justification = c(1, 0))
+
+#use the same method, we can also plot the heating map of family income in the US 
+income_states <-  brfss2013 %>%
+   filter(!is.na(income2)) %>% 
+        select(income2, X_state)
+low_income_states <- income_states %>%
+  group_by(income2, X_state) %>%
+    filter(income2 == "Less than $15,000") %>%
+    summarise(n=n()) %>%
+    mutate(percentage2 = (n/sum(n))*100)
+  
+low_income_states_map <- low_income_states %>%
+    mutate(region= tolower(X_state))
+
+states_map2 <- merge(us_states, low_income_states_map, by="region")
+ggplot() +
+  geom_polygon(data = states_map2, aes(x= long, y = lat, group = group, fill = percentage2), color = "white") + 
+  ggtitle("Heat map of low income families in the U.S.") +
+  scale_fill_gradient2(low = "blue", mid = "grey", high = "darkred") + 
+  theme(legend.position = c(1, 0), legend.justification = c(1, 0))
+
+# conclusion: We can see the two maps have some similarities. The sickest state also is the state with the lowest income. And most states that are low-income also in general have poor health conditions. 
+```
+
